@@ -2,6 +2,7 @@ const express = require('express');
 
 // MIDDLEWARE
 const ProtectMiddleware = require('../app/Middleware/ProtectMiddleware');
+const AdminMiddleware = require('../app/Middleware/AdminMiddleware');
 
 // CONTROLLER
 const AuthController = require('../app/Controllers/AuthController.js');
@@ -13,6 +14,7 @@ const LanguageController = require('../app/Controllers/LanguageController.js');
 const DocsController = require('../app/Controllers/DocsController.js');
 const StatsController = require('../app/Controllers/StatsController.js');
 const InfoController = require('../app/Controllers/InfoController.js');
+const InviteCodeController = require('../app/Controllers/InviteCodeController.js');
 
 const router = express.Router();
 
@@ -68,5 +70,11 @@ router.use('/swagger', DocsController.swagger);
 
 // Info
 router.get('/info', InfoController.sendInfo);
+
+// Admin
+router.post('/inviteCode', AdminMiddleware, InviteCodeController.addInviteCode);
+router.delete('/inviteCode/:inviteCode', AdminMiddleware, InviteCodeController.deleteInviteCode);
+router.get('/inviteCode', AdminMiddleware, InviteCodeController.sendInviteCodes);
+router.get('/inviteCode/:inviteCode', InviteCodeController.checkInviteCode);
 
 module.exports = router;

@@ -5,6 +5,7 @@ const { deleteKeysFromObject } = require('../utils');
 const { User, Role } = require('../../database');
 const ApiError = require('../utils/ApiError.js');
 const httpStatus = require('http-status');
+const { validateInviteCode, useInviteCode } = require('../Services/InviteCodeProvider.js');
 
 // Validate inputs from /register and /login route
 function validateAuth(req) {
@@ -15,8 +16,33 @@ function validateAuth(req) {
   return true;
 }
 
+// check if user is an admin or not
+const checkIfAdmin = async (id) => {
+  const user = await User.findOne({
+    include: [
+      {
+        model: Role,
+        attributes: ['adminRights'],
+      },
+    ],
+    where: {
+      id,
+    },
+  });
+
+  return user.Role.adminRights;
+};
+
 // Validate inputs from /register route
 async function validateRegister(req, res) {
+  // if server is locked check for invite codes
+  if (process.env.LOCKED) {
+    if (!req.query.inviteCode) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Locked Server! Invite Code is missing');
+    }
+    await validateInviteCode(req.query.inviteCode);
+  }
+
   validateAuth(req, res);
 
   // check if email address is valid
@@ -47,6 +73,10 @@ async function validateRegister(req, res) {
   ) {
     throw new ApiError(httpStatus.CONFLICT, 'username is already taken', 'username');
   }
+  // after everything is registered redeem the code
+  if (process.env.LOCKED) {
+    await useInviteCode(req.query.inviteCode);
+  }
 
   return true;
 }
@@ -75,7 +105,11 @@ async function createUser({ username, email, password }) {
     roleId: role.id,
   });
 
-  return deleteKeysFromObject(['roleId', 'email', 'password', 'createdAt', 'updatedAt'], user.toJSON());
+  // add flag if user is admin
+  const isAdmin = await checkIfAdmin(user.id);
+  const tempUser = { ...user.toJSON(), isAdmin };
+
+  return deleteKeysFromObject(['roleId', 'email', 'password', 'createdAt', 'updatedAt'], tempUser);
 }
 
 // Log user in
@@ -100,8 +134,11 @@ async function loginUser({ email, password }) {
   if (!isPasswordValid) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'invalid password', 'password');
   }
+  // add flag if user is admin
+  const isAdmin = await checkIfAdmin(user.id);
+  const tempUser = { ...user.toJSON(), isAdmin };
 
-  return deleteKeysFromObject(['roleId', 'password', 'createdAt', 'updatedAt'], user.toJSON());
+  return deleteKeysFromObject(['roleId', 'password', 'createdAt', 'updatedAt'], tempUser);
 }
 
 async function destroyUser(userId) {
@@ -165,4 +202,5 @@ module.exports = {
   destroyUser,
   changePassword,
   checkPasswordValid,
+  checkIfAdmin,
 };

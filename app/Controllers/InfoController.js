@@ -5,6 +5,7 @@ const sendInfo = catchAsync(async (_req, res) => {
   res.send({
     identifier: 'vocascan-server',
     version: getVersion(),
+    locked: process.env.LOCKED === 'true',
     commitRef: await getGitDescribe(),
   });
 });
